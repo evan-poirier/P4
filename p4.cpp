@@ -58,7 +58,8 @@ private:
 
 public:
    // make private later
-   void addWord(int key, string word, int index, int line); // given a word, index to add to, and line number, add a word to the table
+   int addWord(int key, string word, int index, int line); // given a word, index to add to, and line number, add a word to the table
+   // addWord returns 1 if it added a new word or incremented instances, and 0 if spot was full
    void hashWord(string word, int currLineNum);
    
    void insertLine(string line, int currLineNum);
@@ -93,7 +94,7 @@ void Word::print(ostream &os) {
          os << this->instances.at(i);
       }
    }
-   os << "]" << endl;
+   os << "]";
 }
 
 void Word::addInstance(int lineNum) {
@@ -158,37 +159,48 @@ HashTable::HashTable(int size, string collisionStrat, int dhParameter) {
 
 // works with uninitialized table, test with added contents
 void HashTable::print(ostream &os) {
-   os << "Printing hash table contents below: " << endl << endl;
+   os << "The number of words found in the file was " << this->totalWordsScanned << endl;
+   os << "The number of unique words found in the file was " << this->numUniqueWords << endl;
+   os << "The number of collisions was " << this->numCollisions << endl << endl;
+
+   // print every index in the table (not used for project)
    for (int i = 0; i < this->size; i ++) {
-      os << "Index " << i << ": ";
-      if ((this->currWord + i)->isEmpty()) {
-         os << "is empty" << endl;
-      } else {
+      os << i << ": ";
+      if (!(this->currWord + i)->isEmpty()) {
          (this->currWord + i)->print(os);
       }
+      os << endl;
    }
 }
 
-void HashTable::addWord(int key, string word, int index, int line) {
+int HashTable::addWord(int key, string word, int index, int line) {
    if (index > this->size - 1) {
       cout << "Failed to add word to table: index out of range" << endl;
-      return;
+      return 0;
    }
 
    Word* targetWord = (this->currWord + index);
 
-   // change the text if the word pointer is null
+   // if inserting into empty cell, just insert and return 1
    if (targetWord->isEmpty()) {
-      (this->numUniqueWords) ++;
       targetWord->key = key;
       targetWord->text = word;
+      targetWord->addInstance(line);
+      (this->numUniqueWords) ++;
+      return 1;
+   } else {
+      // if the word matches the cell, increment instances, else return 0
+      if (targetWord->text == word) {
+         targetWord->addInstance(line);
+         return 1;
+      } else {
+         return 0;
+      }
    }
-   
-   (this->totalWordsScanned) ++;
-   targetWord->addInstance(line);
 }
 
 void HashTable::hashWord(string word, int currLineNum) {
+   (this->totalWordsScanned) ++;
 
    int h1 = djb2(word) % this->size;
    int h2;
@@ -200,12 +212,27 @@ void HashTable::hashWord(string word, int currLineNum) {
    if (this->collisionStrat == "lp") {
       for (int i = 0; i < this->size; i ++) {
          int index = (h1 + i) % size;
-         
+         if (this->addWord(h1, word, index, currLineNum)) {
+            break;
+         }
+         (this->numCollisions) ++;
       }
    } else if (this->collisionStrat == "qp") {
-
+      for (int i = 0; i < this->size; i ++) {
+         int index = (h1 + i*i) % size;
+         if (this->addWord(h1, word, index, currLineNum)) {
+            break;
+         }
+         (this->numCollisions) ++;
+      }
    } else if (this->collisionStrat == "dh") {
-
+      for (int i = 0; i < this->size; i ++) {
+         int index = (h1 + i*h2) % size;
+         if (this->addWord(h1, word, index, currLineNum)) {
+            break;
+         }
+         (this->numCollisions) ++;
+      }
    } else {
       cout << "Invalid collsion strategy" << endl;
    }
@@ -226,17 +253,16 @@ void HashTable::insertLine(string line, int currLineNum) {
 
          if ((i == length - 1) && (currWord.length() > 0)) {
             // add current word to table
-            cout << currWord << " ";
+            this->hashWord(currWord, currLineNum);
          }
       } else {
          if (currWord.length() > 0) {
             // add current word to table
-            cout << currWord << " ";
+            this->hashWord(currWord, currLineNum);
          }
          currWord = "";
       }   
    }
-   cout << endl;
 }
 
 
@@ -251,15 +277,12 @@ int main(int argc, char* argv[]) {
    string collisionResStrategy;
    int doubleHashParameter = 0;
 
-   bool doubleHash; //true if the strategy is double hash
-
    inputFileName = string(argv[1]);
    queryFileName = string(argv[2]);
    hashTableSize = atoi(argv[3]);
    collisionResStrategy = string(argv[4]);
 
    if (argc == 6) {
-      doubleHash = true;
       doubleHashParameter = atoi(argv[5]);
    }
 
@@ -281,6 +304,8 @@ int main(int argc, char* argv[]) {
       
       lineNum ++;
    }
+
+   table->print(cout);
 
    inputFile.close();
    queryFile.close();
