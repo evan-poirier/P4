@@ -163,7 +163,7 @@ void HashTable::print(ostream &os) {
    os << "The number of unique words found in the file was " << this->numUniqueWords << endl;
    os << "The number of collisions was " << this->numCollisions << endl << endl;
 
-   // print every index in the table (not used for project)
+   /* print every index in the table (not used for project)
    for (int i = 0; i < this->size; i ++) {
       os << i << ": ";
       if (!(this->currWord + i)->isEmpty()) {
@@ -171,6 +171,7 @@ void HashTable::print(ostream &os) {
       }
       os << endl;
    }
+   */
 }
 
 int HashTable::addWord(int key, string word, int index, int line) {
@@ -227,7 +228,7 @@ void HashTable::hashWord(string word, int currLineNum) {
       }
    } else if (this->collisionStrat == "dh") {
       for (int i = 0; i < this->size; i ++) {
-         int index = (h1 + i*h2) % size;
+         int index = (h1 + (i*h2)) % size;
          if (this->addWord(h1, word, index, currLineNum)) {
             break;
          }
