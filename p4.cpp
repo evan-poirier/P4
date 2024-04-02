@@ -22,6 +22,15 @@ unsigned long djb2(string str) {
    return hash;
 }
 
+int h1(string key, int size) {
+   return djb2(key) % size;
+}
+
+int h2(string key, int parameter) {
+   if (parameter == 0) {return 1;}
+   return parameter - (djb2(key) % parameter);
+}
+
 
 // *************
 // CLASS HEADERS
@@ -63,6 +72,7 @@ public:
    void hashWord(string word, int currLineNum);
    
    void insertLine(string line, int currLineNum);
+   void search(string word, ostream &os);
    void print(ostream &os);
 
    HashTable();
@@ -94,7 +104,7 @@ void Word::print(ostream &os) {
          os << this->instances.at(i);
       }
    }
-   os << "]";
+   os << "]" << endl;
 }
 
 void Word::addInstance(int lineNum) {
@@ -157,11 +167,12 @@ HashTable::HashTable(int size, string collisionStrat, int dhParameter) {
    this->currWord = array;
 }
 
+
 // works with uninitialized table, test with added contents
 void HashTable::print(ostream &os) {
    os << "The number of words found in the file was " << this->totalWordsScanned << endl;
    os << "The number of unique words found in the file was " << this->numUniqueWords << endl;
-   os << "The number of collisions was " << this->numCollisions << endl << endl;
+   os << "The number of collisions was " << this->numCollisions << endl;
 
    /* print every index in the table (not used for project)
    for (int i = 0; i < this->size; i ++) {
@@ -169,7 +180,6 @@ void HashTable::print(ostream &os) {
       if (!(this->currWord + i)->isEmpty()) {
          (this->currWord + i)->print(os);
       }
-      os << endl;
    }
    */
 }
@@ -203,33 +213,29 @@ int HashTable::addWord(int key, string word, int index, int line) {
 void HashTable::hashWord(string word, int currLineNum) {
    (this->totalWordsScanned) ++;
 
-   int h1 = djb2(word) % this->size;
-   int h2;
-   
-   if (this->dhParameter > 0) {
-      h2 = this->dhParameter - (djb2(word) % this->dhParameter);
-   }
+   int a = h1(word, this->size);
+   int b = h2(word, this->dhParameter);
 
    if (this->collisionStrat == "lp") {
       for (int i = 0; i < this->size; i ++) {
-         int index = (h1 + i) % size;
-         if (this->addWord(h1, word, index, currLineNum)) {
+         int index = (a + i) % size;
+         if (this->addWord(a, word, index, currLineNum)) {
             break;
          }
          (this->numCollisions) ++;
       }
    } else if (this->collisionStrat == "qp") {
       for (int i = 0; i < this->size; i ++) {
-         int index = (h1 + i*i) % size;
-         if (this->addWord(h1, word, index, currLineNum)) {
+         int index = (a + i*i) % size;
+         if (this->addWord(a, word, index, currLineNum)) {
             break;
          }
          (this->numCollisions) ++;
       }
    } else if (this->collisionStrat == "dh") {
       for (int i = 0; i < this->size; i ++) {
-         int index = (h1 + (i*h2)) % size;
-         if (this->addWord(h1, word, index, currLineNum)) {
+         int index = (a + (i*b)) % size;
+         if (this->addWord(a, word, index, currLineNum)) {
             break;
          }
          (this->numCollisions) ++;
@@ -266,6 +272,76 @@ void HashTable::insertLine(string line, int currLineNum) {
    }
 }
 
+
+void HashTable::search(string word, ostream &os) {
+   int collisions = 0;
+   int a = h1(word, this->size);
+   int b = h2(word, this->dhParameter);
+
+   os << endl;
+
+   if (this->collisionStrat == "lp") {
+      for (int i = 0; i < this->size; i ++) {
+         int index = (a + i) % size;
+         Word* targetWord = (this->currWord + index);
+
+         //cout << "Searching for " << word << " at index " << index << endl;
+
+         if (targetWord->isEmpty()) {
+            //cout << "Index was empty, word is not in list" << endl;
+            os << word << " appears on lines []" << endl;
+            break;
+         } else {
+            if (targetWord->text == word) {
+               //cout << "Index contained word, success" << endl;
+               targetWord->print(os);
+               break;
+            } else {
+               //cout << "Index contained another word, trying again" << endl;
+               collisions ++;
+            }
+         }
+      }
+   } else if (this->collisionStrat == "qp") {
+      for (int i = 0; i < this->size; i ++) {
+         int index = (a + i*i) % size;
+         Word* targetWord = (this->currWord + index);
+
+         if (targetWord->isEmpty()) {
+            os << word << " appears on lines []" << endl;
+            break;
+         } else {
+            if (targetWord->text == word) {
+               targetWord->print(os);
+               break;
+            } else {
+               collisions ++;
+            }
+         }
+      }
+   } else if (this->collisionStrat == "dh") {
+      for (int i = 0; i < this->size; i ++) {
+         int index = (a + (i*b)) % size;
+         Word* targetWord = (this->currWord + index);
+
+         if (targetWord->isEmpty()) {
+            os << word << " appears on lines []" << endl;
+            break;
+         } else {
+            if (targetWord->text == word) {
+               targetWord->print(os);
+               break;
+            } else {
+               collisions ++;
+            }
+         }
+      }
+   } else {
+      os << "Invalid collsion strategy" << endl;
+   }
+
+   os << "The search had " << collisions << " collisions" << endl;
+}
 
 // ****
 // MAIN
@@ -307,6 +383,11 @@ int main(int argc, char* argv[]) {
    }
 
    table->print(cout);
+
+   string query;
+   while (getline(queryFile, query)) {
+      table->search(query, cout);
+   }
 
    inputFile.close();
    queryFile.close();
